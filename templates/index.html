@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foro Comunitario Colombia</title>
+    <style>
+        :root { --primario: #003893; --secundario: #e7c011; --rojo: #ce1126; --fondo: #f4f6f9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--fondo); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { background: var(--primario); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 5px solid var(--secundario); }
+        h1 { margin: 0; font-size: 24px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: var(--primario); color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        .btn-danger { background: var(--rojo); }
+        .post { border-left: 4px solid var(--primario); }
+        .post-header { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 10px; }
+        .post-title { font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #111; }
+        .reactions { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .btn-like { background: #e8f5e9; color: #2e7d32; }
+        .btn-dislike { background: #ffebee; color: #c62828; }
+        .comment-section { margin-top: 15px; background: #fafafa; padding: 10px; border-radius: 4px; }
+        .comment { font-size: 14px; border-bottom: 1px solid #ddd; padding: 6px 0; }
+        .comment-author { font-weight: bold; color: var(--primario); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🇨🇴 Foro Comunitario Colombia</h1>
+            <div id="user-info">
+                <span id="welcome-msg"></span>
+                <button id="btn-logout" class="btn-danger hidden" onclick="logout()">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <!-- Formularios de Registro e Inicio de Sesión -->
+        <div id="auth-forms" class="card">
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                    <h3>Iniciar Sesión</h3>
+                    <form onsubmit="login(event)">
+                        <div class="form-group">
+                            <label>Correo Electrónico</label>
+                            <input type="email" id="login-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <input type="password" id="login-pass" required>
+                        </div>
+                        <button type="submit">Entrar</button>
+                    </form>
+                </div>
+                <div style="flex: 1; border-left: 1px solid #eee; padding-left: 20px;">
+                    <h3>Registro</h3>
+                    <form onsubmit="registro(event)">
+                        <div class="form-group">
+                            <label>Nombre Completo</label>
+                            <input type="text" id="reg-nombre" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Correo Electrónico</label>
+                            <input type="email" id="reg-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <input type="password" id="reg-pass" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Departamento</label>
+                            <select id="reg-depto" required>
+                                <option value="">Seleccione...</option>
+                                <option value="Antioquia">Antioquia</option>
+                                <option value="Bogotá D.C.">Bogotá D.C.</option>
+                                <option value="Valle del Cauca">Valle del Cauca</option>
+                                <option value="Atlántico">Atlántico</option>
+                                <option value="Santander">Santander</option>
+                            </select>
+                        </div>
+                        <button type="submit">Registrarse</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario para Nueva Publicación -->
+        <div id="new-post-card" class="card hidden">
+            <h3>Crear Publicación</h3>
+            <form onsubmit="crearPost(event)">
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="post-titulo" placeholder="Ej: ¿Mejores lugares para visitar en Antioquia?" required>
+                </div>
+                <div class="form-group">
+                    <label>Contenido</label>
+                    <textarea id="post-contenido" rows="3" required></placeholder></textarea>
+                </div>
+                <button type="submit">Publicar</button>
+            </form>
+        </div>
+
+        <!-- Feed de Publicaciones -->
+        <h2>Temas de Discusión</h2>
+        <div id="posts-feed"></div>
+    </div>
+
+    <script>
+        async function cargarFeed() {
+            const res = await fetch('/api/publicaciones');
+            const data = await res.json();
+            
+            const authForms = document.getElementById('auth-forms');
+            const newPostCard = document.getElementById('new-post-card');
+            const welcomeMsg = document.getElementById('welcome-msg');
+            const btnLogout = document.getElementById('btn-logout');
+
+            if (data.usuario_actual) {
+                authForms.classList.add('hidden');
+                newPostCard.classList.remove('hidden');
+                welcomeMsg.innerText = `Hola, ${data.usuario_actual} | `;
+                btnLogout.classList.remove('hidden');
+            } else {
+                authForms.classList.remove('hidden');
+                newPostCard.classList.add('hidden');
+                welcomeMsg.innerText = '';
+                btnLogout.classList.add('hidden');
+            }
+
+            const feed = document.getElementById('posts-feed');
+            feed.innerHTML = '';
+
+            data.posts.forEach(post => {
+                const pDiv = document.createElement('div');
+                pDiv.className = 'card post';
+                pDiv.innerHTML = `
+                    <div class="post-header">
+                        <span>Por: <b>${post.autor}</b> (${post.departamento})</span>
+                        <span>${post.creado_en}</span>
+                    </div>
+                    <div class="post-title">${post.titulo}</div>
+                    <div>${post.contenido}</div>
+                    <div class="reactions">
+                        <button class="btn-like" onclick="votar(${post.id}, 1)">👍 Me gusta (${post.likes})</button>
+                        <button class="btn-dislike" onclick="votar(${post.id}, -1)">👎 No me gusta (${post.dislikes})</button>
+                    </div>
+                    <div class="comment-section">
+                        <h4>Comentarios</h4>
+                        <div id="comments-${post.id}">
+                            ${post.comentarios.map(c => `<div class="comment"><span class="comment-author">${c.autor}:</span> ${c.contenido}</div>`).join('')}
+                        </div>
+                        ${data.usuario_actual ? `
+                            <div style="display:flex; gap:10px; margin-top:10px;">
+                                <input type="text" id="input-comment-${post.id}" placeholder="Escribe un comentario...">
+                                <button onclick="comentar(${post.id})">Comentar</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                feed.appendChild(pDiv);
+            });
+        }
+
+        async function registro(e) {
+            e.preventDefault();
+            const res = await fetch('/api/registro', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    nombre: document.getElementById('reg-nombre').value,
+                    email: document.getElementById('reg-email').value,
+                    password: document.getElementById('reg-pass').value,
+                    departamento: document.getElementById('reg-depto').value
+                })
+            });
+            const data = await res.json();
+            alert(data.mensaje);
+            if(data.status === 'ok') cargarFeed();
+        }
+
+        async function login(e) {
+            e.preventDefault();
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email: document.getElementById('login-email').value,
+                    password: document.getElementById('login-pass').value
+                })
+            });
+            const data = await res.json();
+            if(data.status === 'ok') cargarFeed();
+            else alert(data.mensaje);
+        }
+
+        async function logout() {
+            await fetch('/api/logout', {method: 'POST'});
+            cargarFeed();
+        }
+
+        async function crearPost(e) {
+            e.preventDefault();
+            await fetch('/api/publicaciones', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    titulo: document.getElementById('post-titulo').value,
+                    contenido: document.getElementById('post-contenido').value
+                })
+            });
+            document.getElementById('post-titulo').value = '';
+            document.getElementById('post-contenido').value = '';
+            cargarFeed();
+        }
+
+        async function votar(postId, tipo) {
+            const res = await fetch('/api/reaccion', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({post_id: postId, tipo_voto: tipo})
+            });
+            if(res.status === 401) alert('Debes iniciar sesión para votar');
+            else cargarFeed();
+        }
+
+        async function comentar(postId) {
+            const input = document.getElementById(`input-comment-${postId}`);
+            if(!input.value.trim()) return;
+            const res = await fetch('/api/comentar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({post_id: postId, contenido: input.value})
+            });
+            if(res.status === 401) alert('Debes iniciar sesión para comentar');
+            else cargarFeed();
+        }
+
+        cargarFeed();
+    </script>
+</body>
+</html>
